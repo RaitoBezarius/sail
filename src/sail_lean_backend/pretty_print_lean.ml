@@ -187,6 +187,7 @@ let string_of_exp_con (E_aux (e, _)) =
   | E_tuple _ -> "E_tuple"
   | E_vector _ -> "E_vector"
   | E_let _ -> "E_let"
+  | E_config _ -> "E_config"
 
 let rec doc_exp (E_aux (e, (l, annot)) as full_exp) =
   let env = env_of_tannot annot in

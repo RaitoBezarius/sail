@@ -151,6 +151,7 @@ let all_pragmas =
       "target_set";
       "non_exec";
       "c_in_main";
+      "c_in_main_post";
     ]
 
 let wrap_include l file = function
