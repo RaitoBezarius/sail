@@ -716,7 +716,7 @@ let hoist_allocations recursive_functions = function
             cleanups := iclear ctyp hid :: !cleanups;
             let instrs = instrs_rename decl_id hid instrs in
             I_aux (I_reset (ctyp, hid), annot) :: hoist instrs
-        | I_aux (I_init (ctyp, decl_id, cval), annot) :: instrs when hoist_ctyp ctyp ->
+        | I_aux (I_init (ctyp, decl_id, Init_cval cval), annot) :: instrs when hoist_ctyp ctyp ->
             let hid = hoist_id () in
             decls := idecl (snd annot) ctyp hid :: !decls;
             cleanups := iclear ctyp hid :: !cleanups;
@@ -973,8 +973,6 @@ let rec sgen_cval = function
       Printf.sprintf "{%s}"
         (Util.string_of_list ", " (fun (field, cval) -> zencode_id field ^ " = " ^ sgen_cval cval) fields)
   | V_ctor_unwrap (f, ctor, _) -> Printf.sprintf "%s.variants.%s" (sgen_cval f) (sgen_uid ctor)
-  | V_config_key parts ->
-      Printf.sprintf "(const_sail_string[]){%s}" (Util.string_of_list ", " (fun part -> "\"" ^ part ^ "\"") parts)
   | V_tuple _ -> Reporting.unreachable Parse_ast.Unknown __POS__ "Cannot generate C value for a tuple literal"
 
 and sgen_call op cvals =
@@ -1324,11 +1322,14 @@ let rec codegen_instr fid ctx (I_aux (instr, (_, l))) =
       else string (Printf.sprintf "  %s(%s%s, %s);" fname (extra_arguments is_extern) (sgen_clexp l x) c_args)
   | I_clear (ctyp, _) when is_stack_ctyp ctyp -> empty
   | I_clear (ctyp, id) -> sail_kill ~prefix:"  " ~suffix:";" (sgen_ctyp_name ctyp) "&%s" (sgen_name id)
-  | I_init (CT_json_key, id, V_config_key parts) ->
-      ksprintf string "  sail_config_key %s = {%s};" (sgen_name id)
-        (Util.string_of_list ", " (fun part -> "\"" ^ part ^ "\"") parts)
-  | I_init (ctyp, id, cval) ->
-      codegen_instr fid ctx (idecl l ctyp id) ^^ hardline ^^ codegen_conversion l (CL_id (id, ctyp)) cval
+  | I_init (ctyp, id, init) -> (
+      match init with
+      | Init_cval cval ->
+          codegen_instr fid ctx (idecl l ctyp id) ^^ hardline ^^ codegen_conversion l (CL_id (id, ctyp)) cval
+      | Init_json_key parts ->
+          ksprintf string "  sail_config_key %s = {%s};" (sgen_name id)
+            (Util.string_of_list ", " (fun part -> "\"" ^ part ^ "\"") parts)
+    )
   | I_reinit (ctyp, id, cval) ->
       codegen_instr fid ctx (ireset l ctyp id) ^^ hardline ^^ codegen_conversion l (CL_id (id, ctyp)) cval
   | I_reset (ctyp, id) when is_stack_ctyp ctyp -> string (Printf.sprintf "  %s %s;" (sgen_ctyp ctyp) (sgen_name id))
